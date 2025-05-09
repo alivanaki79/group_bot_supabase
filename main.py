@@ -1,74 +1,66 @@
 import os
-import time
-import threading
+import logging
 import requests
-from datetime import datetime
-from supabase_py import create_client, Client
-from telegram import Update, Bot
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-from flask import Flask
+from flask import Flask, request
+from telegram import Update, ChatPermissions
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+# Load from environment
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+headers = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json"
+}
 
-async def check_subscription(group_id: int) -> bool:
-    try:
-        response = supabase.table("groups").select("*").eq("group_id", group_id).single().execute()
-        data = response.data
-        if not data:
-            return False
-        expire_date = datetime.strptime(data["expire_date"], "%Y-%m-%d")
-        return expire_date >= datetime.now()
-    except Exception:
-        return False
+# --- Supabase Functions ---
+def get_group(chat_id):
+    url = f"{SUPABASE_URL}/rest/v1/groups?chat_id=eq.{chat_id}&select=*"
+    res = requests.get(url, headers=headers)
+    return res.json()
 
-async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
-        return
-    group_id = update.message.chat.id
-    if not await check_subscription(group_id):
-        await update.message.reply_text("⛔ این گروه اشتراک فعال ندارد.")
-        return
-    for user in update.message.new_chat_members:
-        await update.message.reply_text(f"🎉 خوش آمدی {user.full_name}!")
+def send_expiry_warning(application):
+    url = f"{SUPABASE_URL}/rest/v1/groups?select=*"
+    groups = requests.get(url, headers=headers).json()
+    for group in groups:
+        if group.get("expire_date"):
+            from datetime import datetime, timedelta
+            expire_date = datetime.strptime(group["expire_date"], "%Y-%m-%d")
+            if (expire_date - datetime.utcnow()).days == 3:
+                application.bot.send_message(chat_id=group["chat_id"], text="⏳ اشتراک شما ۳ روز دیگر به پایان می‌رسد.")
 
+# --- Bot Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
-        return
-    group_id = update.message.chat.id
-    if not await check_subscription(group_id):
-        await update.message.reply_text("❌ اشتراک این گروه به پایان رسیده است.")
-        return
-    await update.message.reply_text("✅ ربات مدیریت گروه فعال است.")
+    await update.message.reply_text("ربات مدیریت گروه فعال شد.")
 
+async def check_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if "http" in update.message.text or "t.me" in update.message.text:
+        try:
+            await update.message.delete()
+        except:
+            pass
+
+async def ping(context: ContextTypes.DEFAULT_TYPE):
+    send_expiry_warning(context.application)
+
+# --- Run Bot ---
 app = Flask(__name__)
-@app.route("/")
-def ping():
-    return "Bot is alive", 200
 
-def run_flask():
-    app.run(host="0.0.0.0", port=8080)
+@app.route('/')
+def home():
+    return 'OK'
 
-def start_pinger():
-    def ping_forever():
-        while True:
-            try:
-                requests.get("https://telegram-group-bot-render.onrender.com")
-            except:
-                pass
-            time.sleep(300)
-    threading.Thread(target=ping_forever).start()
+async def main():
+    logging.basicConfig(level=logging.INFO)
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), check_links))
+    application.job_queue.run_repeating(ping, interval=300, first=10)  # every 5 min
+    await application.run_polling()
 
-def main():
-    start_pinger()
-    threading.Thread(target=run_flask).start()
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    import asyncio
+    asyncio.run(main())
