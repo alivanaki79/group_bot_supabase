@@ -63,4 +63,6 @@ async def main():
 
 if __name__ == '__main__':
     import asyncio
-    asyncio.run(main())
+    # Directly run the bot with async without asyncio.run
+    asyncio.get_event_loop().run_until_complete(main())
+
