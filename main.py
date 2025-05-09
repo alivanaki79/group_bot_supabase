@@ -68,3 +68,8 @@ bot_app.add_handler(CommandHandler("mute", mute))
 async def start_bot():
     asyncio.create_task(bot_app.run_polling())
 
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
