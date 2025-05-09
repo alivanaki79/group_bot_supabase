@@ -7,6 +7,8 @@ from telegram.ext import (
     ContextTypes, filters
 )
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from fastapi import Request
 import uvicorn
 
 # لیست کلمات ممنوعه
@@ -104,13 +106,9 @@ async def get_user_id_by_username(context, chat_id, username):
 # FastAPI برای بیدار نگه داشتن
 app = FastAPI()
 
-@app.get("/ping")
-def ping():
-    return {"message": "pong"}
-
-@app.get("/")
-def root():
-    return {"status": "Bot is running!"}
+@app.api_route("/", methods=["GET", "POST", "HEAD"])
+async def root(request: Request):
+    return JSONResponse(content={"status": "Bot is running!"})
 
 def start_bot():
     TOKEN = os.getenv("BOT_TOKEN")
