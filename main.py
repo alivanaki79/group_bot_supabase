@@ -3,7 +3,7 @@ import time
 import threading
 import requests
 from datetime import datetime
-from supabase import create_client, Client
+from supabase_py import create_client, Client
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from flask import Flask
