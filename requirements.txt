@@ -1,4 +1,7 @@
 python-telegram-bot==20.7
 requests
 flask
-supabase-py==1.0.3
+postgrest-py==0.10.6
+gotrue==1.2.0
+storage3==0.5.2
+supabase==1.0.4
