@@ -56,7 +56,7 @@ def start_pinger():
     def ping_forever():
         while True:
             try:
-                requests.get("https://YOUR-RENDER-URL.onrender.com")
+                requests.get("https://telegram-group-bot-render.onrender.com")
             except:
                 pass
             time.sleep(300)
